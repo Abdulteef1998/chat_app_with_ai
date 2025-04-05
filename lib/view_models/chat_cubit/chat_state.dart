@@ -8,9 +8,9 @@ class ChatInitial extends ChatState {}
 class ChatLoading extends ChatState {}
 
 class ChatSuccess extends ChatState {
-  final String? message;
+  final List<MessageModel> messages;
 
-  ChatSuccess(this.message);
+  ChatSuccess(this.messages);
 }
 
 class ChatFailure extends ChatState {
