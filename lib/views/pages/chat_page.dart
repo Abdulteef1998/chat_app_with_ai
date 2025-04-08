@@ -1,4 +1,5 @@
 import 'package:chat_app_ai/view_models/chat_cubit/chat_cubit.dart';
+import 'package:chat_app_ai/views/widgets/chat_message_widget.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
@@ -11,17 +12,30 @@ class ChatPage extends StatefulWidget {
 
 class _ChatPageState extends State<ChatPage> {
   late final TextEditingController _messageController;
+  late final ScrollController _scrollController;
   @override
   void initState() {
     super.initState();
     BlocProvider.of<ChatCubit>(context).startChattingSession();
     _messageController = TextEditingController();
+    _scrollController = ScrollController();
   }
 
   @override
   void dispose() {
     _messageController.dispose();
+    _scrollController.dispose();
     super.dispose();
+  }
+
+  void _scrolDown() {
+    WidgetsBinding.instance.addPostFrameCallback(
+      (_) => _scrollController.animateTo(
+        _scrollController.position.maxScrollExtent,
+        duration: Duration(milliseconds: 700),
+        curve: Curves.easeInOut,
+      ),
+    );
   }
 
   Widget build(BuildContext context) {
@@ -40,19 +54,15 @@ class _ChatPageState extends State<ChatPage> {
                   builder: (context, state) {
                     if (state is ChatSuccess) {
                       final messages = state.messages;
-                      return ListView.builder(
+                      return ListView.separated(
+                        controller: _scrollController,
                         itemBuilder: (_, index) {
                           final message = messages[index];
-                          return ListTile(
-                            title: Text(message.text),
-                            subtitle: Text(message.time.toString()),
-                            trailing:
-                                message.isUser
-                                    ? const Icon(Icons.person)
-                                    : const Icon(Icons.computer),
-                          );
+                          return ChatMessageWidget(message: message);
                         },
                         itemCount: messages.length,
+                        separatorBuilder:
+                            (context, index) => const SizedBox(height: 8),
                       );
                     } else {
                       return const Center(child: SizedBox.shrink());
@@ -79,7 +89,9 @@ class _ChatPageState extends State<ChatPage> {
                   BlocConsumer<ChatCubit, ChatState>(
                     bloc: chatCubit,
                     listenWhen:
-                        (previous, current) => current is SendingMessageFailed,
+                        (previous, current) =>
+                            current is SendingMessageFailed ||
+                            current is ChatSuccess,
                     listener: (context, state) {
                       if (state is SendingMessageFailed) {
                         ScaffoldMessenger.of(
@@ -87,16 +99,22 @@ class _ChatPageState extends State<ChatPage> {
                         ).showSnackBar(SnackBar(content: Text(state.error)));
                       }
                     },
+                    buildWhen:
+                        (previous, current) =>
+                            current is MessageSent ||
+                            current is SendingMessage ||
+                            current is SendingMessageFailed,
                     builder: (context, state) {
                       if (state is SendingMessage) {
                         return const CircularProgressIndicator.adaptive();
                       }
                       return IconButton(
+                        icon: Icon(Icons.send),
                         onPressed: () {
                           chatCubit.sendMessage(_messageController.text);
                           _messageController.clear();
+                          _scrolDown();
                         },
-                        icon: Icon(Icons.send),
                       );
                     },
                   ),
